@@ -1,0 +1,188 @@
+---
+title: "Reproducible Research - Assignment 1"
+author: "Ronald Armando"
+date: "5/8/2018"
+output: html_document
+---
+
+```{r}
+rm(list=ls())
+```
+
+
+
+```{r message=FALSE}
+library(ggplot2)
+library(scales)
+library(dplyr)
+library(Hmisc)
+```
+
+## Introduction
+
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the “quantified self” movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
+
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+
+## Loading and preprocessing the data
+
+```{r, results='markup', warning=TRUE, message=TRUE}
+data <- read.csv('activity.csv')
+```
+
+```{r}
+str(data)
+```
+
+By using the str() function, we see that the dataset has 3 variables: steps, date and interval. We also see that there are many NA values in the steps variable.
+
+For the moment, we won't change the formart of the dataset.
+
+-----
+
+## Mean total number of steps taken per day
+
+For this part of the assignment, we will ignore the missing values in the dataset.
+
+
+##### 1. What is mean total number of steps taken per day?
+```{r}
+stepsDay <- aggregate(data$steps, list(data$date), sum, na.rm=TRUE)
+names(stepsDay)<-c("date", "steps")
+```
+
+##### 2. Make a histogram of the total number of steps taken each day
+
+
+```{r}
+qplot(stepsDay$steps, 
+      xlab='Steps/day', 
+      ylab='Frequency (binwith = 1000)',
+      main = 'Histogram - Total number of steps taken each day',
+      binwidth=1000)
+
+```
+
+##### 3. Calculate and report the mean and median total number of steps taken per day
+```{r}
+stepsDMean <- mean(stepsDay$steps)
+stepsDMedian <- median(stepsDay$steps)
+```
+* Mean: `r stepsDMean`
+* Median:  `r stepsDMedian`
+
+-----
+
+
+# Average daily activity pattern
+
+Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+
+##### 1. What is the average daily activity pattern?
+```{r}
+dailyactivity <- aggregate(x=list(steps=data$steps), by=list(interval=data$interval), FUN=mean, na.rm=TRUE)
+```
+
+##### 2. Make a time series plot
+```{r}
+ggplot(data=dailyactivity, aes(x=interval, y=steps)) +
+    geom_line() +
+    xlab("5-minute interval") +
+    ylab("Average number of steps taken") +
+    ggtitle("Time series plot")
+```
+
+##### 3. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+mostSteps <- max(dailyactivity$steps)
+timeMostSteps <-  dailyactivity$interval[which.max(dailyactivity$steps)]
+```
+
+* The number of most steps is: `r mostSteps`
+* They occured at the time interval: `r timeMostSteps`
+
+----
+
+
+# Imputing missing values
+
+##### 1. Calculate and report the total number of missing values in the dataset 
+
+
+```{r}
+missing <- is.na(data$steps)
+missingValues <- sum(missing==TRUE)
+```
+
+* Number of missing values is: `r missingValues`
+
+##### 2. Devise a strategy for filling in all of the missing values in the dataset and create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+```{r}
+# Replace each missing value with the mean value of the day
+fdata<-data
+fdata$steps <- round(impute(data$steps, fun=mean), digits = 0)
+numTotalValues <- length(fdata$steps)
+numMissingValues <- length(which(is.na(fdata$steps)))
+
+str(fdata)
+sum(is.na(fdata))
+
+```
+
+
+##### 3. Make a histogram of the total number of steps taken each day 
+```{r}
+
+stepsDay2 <- aggregate(fdata$steps, list(fdata$date), sum, na.rm=TRUE)
+names(stepsDay2)<-c("date", "steps")
+```
+
+```{r}
+qplot(stepsDay2$steps, 
+      xlab='Steps/day', 
+      ylab='Frequency (binwith = 1000)',
+      main = 'Histogram - Total number of steps taken each day',
+      binwidth=1000)
+
+```
+
+```{r}
+stepsDMean2 <- mean(stepsDay2$steps)
+stepsDMedian2 <- median(stepsDay2$steps)
+```
+* Mean: `r stepsDMean2`
+* Median:  `r stepsDMedian2`
+
+----
+
+# Are there differences in activity patterns between weekdays and weekends?
+
+##### 1. Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+```{r}
+
+fdata$whichday <-  ifelse(as.POSIXlt(as.Date(fdata$date))$wday %in% c(0,6), 'weekend', 'weekday')
+
+fdataInterval <- aggregate(steps ~ interval + whichday, data=fdata, mean)
+```
+
+
+##### 2. Make a panel plot containing a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.
+
+
+```{r}
+
+ggplot(fdataInterval, aes(interval, steps, colour=whichday)) +
+geom_line(linetype="solid", size=1.0) +
+facet_grid(whichday ~ .) +
+labs(title = "Frequency Distribution of Step Activity",
+          x="5-minute interval",
+          y="Average number total daily steps") +
+theme(legend.position="none") 
+```
+
+We see in the plot above that the weekeday activity occurs mostly in the morning (there's a peak around 8 to 9 AM). Though both weekday and weekend shows this peak, we see this effect is more accentuated during the week, while the average activity is more spread out on weekends.
+
